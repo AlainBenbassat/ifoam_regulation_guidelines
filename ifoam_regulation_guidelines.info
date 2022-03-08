@@ -1,0 +1,13 @@
+; $Id$
+
+name = ifoam_regulation_guidelines
+description = API for regulation guidelines
+package = IFOAM
+core = 7.x
+
+files[] = ifoam_regulation_guidelines.module
+files[] = classes/ifoam_regulation_guidelines_api.inc
+files[] = classes/ifoam_regulation_guidelines_contact.inc
+files[] = classes/ifoam_regulation_guidelines_response.inc
+
+
