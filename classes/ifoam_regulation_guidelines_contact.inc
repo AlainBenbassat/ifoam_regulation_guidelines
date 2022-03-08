@@ -99,9 +99,9 @@ class IfoamRegulationGuidelinesContact {
   private function isEmployerMember() {
     $membershipGroupIds = '36, 24, 25, 22';
     $membershipDescriptions = [
-      36 => 'associate',
+      36 => 'associate member',
       24 => 'full member',
-      25 => 'supporting associate',
+      25 => 'supporting associate member',
       22 => 'trial member',
     ];
 
