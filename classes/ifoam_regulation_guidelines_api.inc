@@ -51,7 +51,7 @@ class IformaRegulationGuidelinesApi {
       return;
     }
 
-    $response->status = 'error';
+    $response->status = 'success';
     $response->description = 'contact not found';
   }
 
