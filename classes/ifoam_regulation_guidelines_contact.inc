@@ -28,6 +28,11 @@ class IfoamRegulationGuidelinesContact {
       return;
     }
 
+    if ($this->isEmployerIfoam()) {
+      $this->isMember = 1;
+      return;
+    }
+
     $this->details = 'not a member or sponsor';
     $this->isMember = 0;
   }
@@ -153,6 +158,19 @@ class IfoamRegulationGuidelinesContact {
       $dao = CRM_Core_DAO::executeQuery($sql);
       if ($dao->fetch()) {
         $this->details = $dao->display_name . ' is sponsor of Regulation Guidelines';
+        return TRUE;
+      }
+    }
+
+    return FALSE;
+  }
+
+  private function isEmployerIfoam() {
+    $contactIdIFOAM = 1;
+
+    foreach ($this->employers as $employer) {
+      if ($employer == $contactIdIFOAM) {
+        $this->details = 'employee or boardmember of IFOAM';
         return TRUE;
       }
     }
