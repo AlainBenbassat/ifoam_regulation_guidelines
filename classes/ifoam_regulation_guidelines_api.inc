@@ -9,8 +9,8 @@ class IformaRegulationGuidelinesApi {
     $response = new IfoamRegulationGuidelinesApiResponse();
 
     try {
-      if ($action == 'is_member') {
-        $this->isMember($response, $params);
+      if ($action == 'guidelines_access') {
+        $this->checkGuidelinesAccess($response, $params);
       }
       else {
         $this->notImplemented($response, $action, $params);
@@ -24,16 +24,10 @@ class IformaRegulationGuidelinesApi {
     return $response;
   }
 
-  private function isMember(&$response, $params) {
-    $response->is_member = 0;
-
-    if ($params['email'] == '') {
-      $response->status = 'error';
-      $response->description = 'missing parameter: email';
+  private function checkGuidelinesAccess(&$response, $params) {
+    if ($this->isMissingEmail($response, $params)) {
       return;
     }
-
-    $response->email = $params['email'];
 
     $contact = new IfoamRegulationGuidelinesContact();
     $contact->lookup($params['email']);
@@ -46,13 +40,26 @@ class IformaRegulationGuidelinesApi {
 
     if ($contact->foundOne) {
       $response->status = 'success';
-      $response->is_member = $contact->isMember;
       $response->description = $contact->details;
+      $response->is_member = $contact->isMember;
+      $response->is_free = $contact->isFree;
       return;
     }
 
     $response->status = 'success';
     $response->description = 'contact not found';
+  }
+
+  private function isMissingEmail(&$response, $params) {
+    if ($params['email'] == '') {
+      $response->status = 'error';
+      $response->description = 'missing parameter: email';
+      return TRUE;
+    }
+    else {
+      $response->email = $params['email'];
+      return FALSE;
+    }
   }
 
   private function notImplemented(&$response, $action, $params) {

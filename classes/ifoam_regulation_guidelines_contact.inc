@@ -5,6 +5,7 @@ class IfoamRegulationGuidelinesContact {
   public $foundMultiple = FALSE;
   public $details = 'not a member or sponsor';
   public $isMember = 0;
+  public $isFree = 0;
 
   private $contactId = 0;
   private $employers = [];
@@ -20,16 +21,25 @@ class IfoamRegulationGuidelinesContact {
 
     if ($this->isEmployerMember()) {
       $this->isMember = 1;
+      $this->isFree = 0;
       return;
     }
 
     if ($this->isEmployerSponsor()) {
-      $this->isMember = 1;
+      $this->isMember = 0;
+      $this->isFree = 1;
       return;
     }
 
     if ($this->isEmployerIfoam()) {
-      $this->isMember = 1;
+      $this->isMember = 0;
+      $this->isFree = 1;
+      return;
+    }
+
+    if ($this->isFreeAccessContact()) {
+      $this->isMember = 0;
+      $this->isFree = 1;
       return;
     }
 
@@ -137,7 +147,7 @@ class IfoamRegulationGuidelinesContact {
   }
 
   private function isEmployerSponsor() {
-    $membershipGroupId = 631;
+    $sponsorsGroupId = 631;
 
     foreach ($this->employers as $employer) {
       $sql = "
@@ -153,7 +163,7 @@ class IfoamRegulationGuidelinesContact {
         and
           gc.contact_id = $employer
         and
-          gc.group_id = $membershipGroupId
+          gc.group_id = $sponsorsGroupId
       ";
       $dao = CRM_Core_DAO::executeQuery($sql);
       if ($dao->fetch()) {
@@ -173,6 +183,33 @@ class IfoamRegulationGuidelinesContact {
         $this->details = 'employee or boardmember of IFOAM';
         return TRUE;
       }
+    }
+
+    return FALSE;
+  }
+
+  private function isFreeAccessContact() {
+    $freeAccessGroupId = 635;
+
+    $sql = "
+      select
+        gc.group_id,
+        c.display_name
+      from
+        civicrm_group_contact gc
+      inner join
+        civicrm_contact c on gc.contact_id = c.id
+      where
+        gc.status = 'Added'
+      and
+        gc.contact_id = {$this->contactId}
+      and
+        gc.group_id = $freeAccessGroupId
+    ";
+    $dao = CRM_Core_DAO::executeQuery($sql);
+    if ($dao->fetch()) {
+      $this->details = $dao->display_name . ' is member of the group Developing Organics: REG Free access';
+      return TRUE;
     }
 
     return FALSE;
