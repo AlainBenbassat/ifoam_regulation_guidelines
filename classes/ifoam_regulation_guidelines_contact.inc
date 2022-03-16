@@ -50,7 +50,7 @@ class IfoamRegulationGuidelinesContact {
   private function getByEmail($email) {
     $sql = "
       select
-        c.id
+        distinct c.id
       from
         civicrm_contact c
       inner join
