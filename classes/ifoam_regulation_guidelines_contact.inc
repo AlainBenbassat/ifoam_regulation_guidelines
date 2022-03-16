@@ -19,18 +19,6 @@ class IfoamRegulationGuidelinesContact {
 
     $this->getEmployers();
 
-    if ($this->isEmployerMember()) {
-      $this->isMember = 1;
-      $this->isFree = 0;
-      return;
-    }
-
-    if ($this->isEmployerSponsor()) {
-      $this->isMember = 0;
-      $this->isFree = 1;
-      return;
-    }
-
     if ($this->isEmployerIfoam()) {
       $this->isMember = 0;
       $this->isFree = 1;
@@ -40,6 +28,18 @@ class IfoamRegulationGuidelinesContact {
     if ($this->isFreeAccessContact()) {
       $this->isMember = 0;
       $this->isFree = 1;
+      return;
+    }
+
+    if ($this->isEmployerSponsor()) {
+      $this->isMember = 0;
+      $this->isFree = 1;
+      return;
+    }
+
+    if ($this->isEmployerMember()) {
+      $this->isMember = 1;
+      $this->isFree = 0;
       return;
     }
 
