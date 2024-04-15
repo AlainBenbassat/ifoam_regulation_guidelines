@@ -8,7 +8,8 @@ class IfoamRegulationGuidelinesContact {
   public $isFree = 0;
 
   private $contactId = 0;
-  private $employers = [];
+  private $contactName = '';
+  private $employers = []; // key = employer id, value = display name
 
   public function lookup($email) {
     $this->getByEmail($email);
@@ -48,37 +49,26 @@ class IfoamRegulationGuidelinesContact {
   }
 
   private function getByEmail($email) {
-    $sql = "
-      select
-        distinct c.id
-      from
-        civicrm_contact c
-      inner join
-        civicrm_email e on e.contact_id = c.id
-      where
-        e.email = %1
-      and
-        c.is_deleted = 0
-      and
-        c.contact_type = 'Individual'
-    ";
-    $sqlParams = [
-      1 => [$email, 'String'],
-    ];
-    $dao = CRM_Core_DAO::executeQuery($sql, $sqlParams);
+    $contacts = \Civi\Api4\Contact::get(FALSE)
+      ->addSelect('*', 'row_count')
+      ->addJoin('Email AS email', 'INNER', ['id', '=', 'email.contact_id'])
+      ->addWhere('email.email', '=', $email)
+      ->addWhere('contact_type', '=', 'Individual')
+      ->addWhere('is_deleted', '=', FALSE)
+      ->execute();
 
-    $dao->fetch();
-
-    if ($dao->N == 0) {
+    if ($contacts->countMatched() == 0) {
       $this->foundOne = FALSE;
       $this->foundMultiple = FALSE;
       return;
     }
 
-    if ($dao->N == 1) {
+    if ($contacts->countMatched() == 1) {
       $this->foundOne = TRUE;
       $this->foundMultiple = FALSE;
-      $this->contactId = $dao->id;
+
+      $this->contactId = $contacts[0]['id'];
+      $this->contactName = $contacts[0]['display_name'];
       return;
     }
 
@@ -92,27 +82,21 @@ class IfoamRegulationGuidelinesContact {
     $relTypeEmployeeOf = 5;
     $relTypeOnTheBoardOf = 21;
 
-    $sql = "
-      select distinct
-        contact_id_b employer_id
-      from
-        civicrm_relationship
-      where
-        is_active = 1
-      and
-        contact_id_a = {$this->contactId}
-      and
-        relationship_type_id in ($relTypeEmployeeOf, $relTypeOnTheBoardOf)
-    ";
-
-    $dao = CRM_Core_DAO::executeQuery($sql);
-    while ($dao->fetch()) {
-      $this->employers[] = $dao->employer_id;
+    $relationships = \Civi\Api4\Relationship::get(FALSE)
+      ->addSelect('contact.*')
+      ->addJoin('Contact AS contact', 'INNER', ['contact_id_b', '=', 'contact.id'])
+      ->addWhere('contact_id_a', '=', $this->contactId)
+      ->addWhere('relationship_type_id', 'IN', [$relTypeEmployeeOf, $relTypeOnTheBoardOf])
+      ->addWhere('is_active', '=', TRUE)
+      ->addWhere('contact.is_deleted', '=', FALSE)
+      ->execute();
+    foreach ($relationships as $relationship) {
+      $this->employers[$relationship['contact.id']] = $relationship['contact.display_name'];
     }
   }
 
   private function isEmployerMember() {
-    $membershipGroupIds = '36, 24, 25, 22';
+    $membershipGroupIds = [36, 24, 25, 22];
     $membershipDescriptions = [
       36 => 'associate member',
       24 => 'full member',
@@ -120,25 +104,16 @@ class IfoamRegulationGuidelinesContact {
       22 => 'trial member',
     ];
 
-    foreach ($this->employers as $employer) {
-      $sql = "
-        select
-          gc.group_id,
-          c.display_name
-        from
-          civicrm_group_contact gc
-        inner join
-          civicrm_contact c on gc.contact_id = c.id
-        where
-          gc.status = 'Added'
-        and
-          gc.contact_id = $employer
-        and
-          gc.group_id in ($membershipGroupIds)
-      ";
-      $dao = CRM_Core_DAO::executeQuery($sql);
-      if ($dao->fetch()) {
-        $this->details = $dao->display_name . ' is ' . $membershipDescriptions[$dao->group_id];
+    foreach ($this->employers as $employerId => $employerName) {
+      $groupContacts = \Civi\Api4\GroupContact::get(FALSE)
+        ->addWhere('group_id', 'IN', $membershipGroupIds)
+        ->addWhere('contact_id', '=', $employerId)
+        ->addWhere('status', '=', 'Added')
+        ->execute()
+        ->first();
+
+      if ($groupContacts) {
+        $this->details = $employerName . ' is ' . $membershipDescriptions[$groupContacts['group_id']];
         return TRUE;
       }
     }
@@ -149,25 +124,16 @@ class IfoamRegulationGuidelinesContact {
   private function isEmployerSponsor() {
     $sponsorsGroupId = 631;
 
-    foreach ($this->employers as $employer) {
-      $sql = "
-        select
-          gc.group_id,
-          c.display_name
-        from
-          civicrm_group_contact gc
-        inner join
-          civicrm_contact c on gc.contact_id = c.id
-        where
-          gc.status = 'Added'
-        and
-          gc.contact_id = $employer
-        and
-          gc.group_id = $sponsorsGroupId
-      ";
-      $dao = CRM_Core_DAO::executeQuery($sql);
-      if ($dao->fetch()) {
-        $this->details = $dao->display_name . ' is sponsor of Regulation Guidelines';
+    foreach ($this->employers as $employerId => $employerName) {
+      $groupContacts = \Civi\Api4\GroupContact::get(FALSE)
+        ->addWhere('group_id', '=', $sponsorsGroupId)
+        ->addWhere('contact_id', '=', $employerId)
+        ->addWhere('status', '=', 'Added')
+        ->execute()
+        ->first();
+
+      if ($groupContacts) {
+        $this->details = $employerName . ' is sponsor of Regulation Guidelines';
         return TRUE;
       }
     }
@@ -178,41 +144,32 @@ class IfoamRegulationGuidelinesContact {
   private function isEmployerIfoam() {
     $contactIdIFOAM = 1;
 
-    foreach ($this->employers as $employer) {
-      if ($employer == $contactIdIFOAM) {
-        $this->details = 'employee or boardmember of IFOAM';
-        return TRUE;
-      }
+    if (array_key_exists($contactIdIFOAM, $this->employers)) {
+      $this->details = 'employee or boardmember of IFOAM';
+      return TRUE;
     }
-
-    return FALSE;
+    else {
+      return FALSE;
+    }
   }
 
   private function isFreeAccessContact() {
     $freeAccessGroupId = 635;
 
-    $sql = "
-      select
-        gc.group_id,
-        c.display_name
-      from
-        civicrm_group_contact gc
-      inner join
-        civicrm_contact c on gc.contact_id = c.id
-      where
-        gc.status = 'Added'
-      and
-        gc.contact_id = {$this->contactId}
-      and
-        gc.group_id = $freeAccessGroupId
-    ";
-    $dao = CRM_Core_DAO::executeQuery($sql);
-    if ($dao->fetch()) {
-      $this->details = $dao->display_name . ' is member of the group Developing Organics: REG Free access';
+    $groupContacts = \Civi\Api4\GroupContact::get(FALSE)
+      ->addWhere('group_id', '=', $freeAccessGroupId)
+      ->addWhere('contact_id', '=', $this->contactId)
+      ->addWhere('status', '=', 'Added')
+      ->execute()
+      ->first();
+
+    if ($groupContacts) {
+      $this->details = $this->contactName . ' is member of the group Developing Organics: REG Free access';
       return TRUE;
     }
-
-    return FALSE;
+    else {
+      return FALSE;
+    }
   }
 
 }
