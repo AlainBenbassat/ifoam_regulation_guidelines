@@ -55,6 +55,7 @@ class IfoamRegulationGuidelinesContact {
       ->addWhere('email.email', '=', $email)
       ->addWhere('contact_type', '=', 'Individual')
       ->addWhere('is_deleted', '=', FALSE)
+      ->addGroupBy('id')
       ->execute();
 
     if ($contacts->countMatched() == 0) {
