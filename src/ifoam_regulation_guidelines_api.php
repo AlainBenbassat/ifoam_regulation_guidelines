@@ -1,6 +1,9 @@
 <?php
 
-class IformaRegulationGuidelinesApi {
+require_once __DIR__ . '/ifoam_regulation_guidelines_response.php';
+require_once __DIR__ . '/ifoam_regulation_guidelines_contact.php';
+
+class IfoamRegulationGuidelinesApi {
   public function __construct() {
     civicrm_initialize();
   }
